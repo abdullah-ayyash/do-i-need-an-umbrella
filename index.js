@@ -1,6 +1,12 @@
 // Global variables
 let currentCities = [];
 let currentAnimation = null;
+let weatherCache = new Map();
+let locationCache = new Map();
+
+// Cache duration (10 minutes for weather, 1 hour for geocoding)
+const WEATHER_CACHE_DURATION = 10 * 60 * 1000; // 10 minutes
+const LOCATION_CACHE_DURATION = 60 * 60 * 1000; // 1 hour
 
 // DOM elements
 const loading = document.getElementById("loading");
@@ -25,14 +31,39 @@ function debounce(func, wait) {
   };
 }
 
+// Cache utilities
+function getCacheKey(lat, lon) {
+  return `${Math.round(lat * 100) / 100}_${Math.round(lon * 100) / 100}`;
+}
+
+function isCacheValid(timestamp, duration) {
+  return Date.now() - timestamp < duration;
+}
+
+// Background switching function
+function setWeatherBackground(animationType) {
+  const body = document.body;
+  body.classList.remove("rainy-bg", "sunny-bg", "cloudy-bg");
+
+  switch (animationType) {
+    case "rain":
+      body.classList.add("rainy-bg");
+      break;
+    case "sun":
+      body.classList.add("sunny-bg");
+      break;
+    case "clouds":
+      body.classList.add("cloudy-bg");
+      break;
+  }
+}
+
 // Initialize the app
 document.addEventListener("DOMContentLoaded", function () {
-  // Show location prompt and request location
   loading.style.display = "block";
   locationPrompt.style.display = "none";
   requestLocation();
 
-  // Set up event listeners
   checkBtn.addEventListener("click", getWeatherByCity);
   cityInput.addEventListener("keypress", function (e) {
     if (e.key === "Enter") {
@@ -40,18 +71,13 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
 
-  // City input event listeners for suggestions
   cityInput.addEventListener("input", function (e) {
     const query = e.target.value;
-
-    // Immediate feedback for empty input
     if (!query.trim()) {
       suggestions.classList.add("hidden");
       currentCities = [];
       return;
     }
-
-    // Use debounced search for actual queries
     debouncedSearch(query);
   });
 
@@ -62,7 +88,6 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
 
-  // Hide suggestions when focus is lost
   document.addEventListener("click", function (e) {
     if (!inputSection.contains(e.target)) {
       suggestions.classList.add("hidden");
@@ -70,11 +95,9 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 });
 
-// Create weather animation based on precipitation
+// Weather animation functions
 function createWeatherAnimation(type) {
-  // Remove any existing animation
   removeWeatherAnimation();
-
   const animationContainer = document.createElement("div");
   animationContainer.className = "weather-animation";
   document.body.appendChild(animationContainer);
@@ -89,13 +112,11 @@ function createWeatherAnimation(type) {
   }
 }
 
-// Create rain animation
 function createRainAnimation(container) {
   const rainContainer = document.createElement("div");
   rainContainer.className = "rain";
   container.appendChild(rainContainer);
 
-  // Create raindrops
   for (let i = 0; i < 80; i++) {
     const drop = document.createElement("div");
     drop.className = "drop";
@@ -107,13 +128,11 @@ function createRainAnimation(container) {
   }
 }
 
-// Create sun animation
 function createSunAnimation(container) {
   const sun = document.createElement("div");
   sun.className = "sun";
   container.appendChild(sun);
 
-  // Create sun rays
   for (let i = 0; i < 12; i++) {
     const ray = document.createElement("div");
     ray.className = "sun-ray";
@@ -122,13 +141,11 @@ function createSunAnimation(container) {
   }
 }
 
-// Create clouds animation
 function createCloudsAnimation(container) {
   const cloudsContainer = document.createElement("div");
   cloudsContainer.className = "clouds";
   container.appendChild(cloudsContainer);
 
-  // Create clouds
   for (let i = 0; i < 6; i++) {
     const cloud = document.createElement("div");
     cloud.className = "cloud";
@@ -143,7 +160,6 @@ function createCloudsAnimation(container) {
   }
 }
 
-// Remove weather animation
 function removeWeatherAnimation() {
   if (currentAnimation) {
     document.body.removeChild(currentAnimation);
@@ -155,51 +171,75 @@ function requestLocation() {
   if ("geolocation" in navigator) {
     navigator.geolocation.getCurrentPosition(
       function (position) {
-        // Successfully got location
         loading.style.display = "block";
         locationPrompt.style.display = "none";
         getWeatherByCoords(position.coords.latitude, position.coords.longitude);
       },
       function (error) {
-        // Location access denied or error
         loading.style.display = "none";
         locationPrompt.style.display = "none";
         permissionDenied.style.display = "block";
         inputSection.style.display = "block";
-        // Don't show any result initially
         result.style.display = "none";
       },
-      { timeout: 10000, enableHighAccuracy: true }
+      { timeout: 5000, enableHighAccuracy: false }
     );
   } else {
-    // Geolocation not supported
     loading.style.display = "none";
     locationPrompt.style.display = "none";
     permissionDenied.innerHTML =
       '<p><i class="fas fa-exclamation-circle"></i> Geolocation is not supported by your browser. Please enter your city manually.</p>';
     permissionDenied.style.display = "block";
     inputSection.style.display = "block";
-    // Don't show any result initially
     result.style.display = "none";
   }
 }
 
+// Optimized weather fetching with caching
 async function getWeatherByCoords(lat, lon) {
+  const cacheKey = getCacheKey(lat, lon);
+  const cached = weatherCache.get(cacheKey);
+
+  // Check if we have valid cached data
+  if (cached && isCacheValid(cached.timestamp, WEATHER_CACHE_DURATION)) {
+    console.log("Using cached weather data");
+    displayResult(cached.data, "your location");
+    loading.style.display = "none";
+    return;
+  }
+
   try {
-    // Fetch weather data from Open-Meteo API
+    // Optimized API call - only get what we need
     const response = await fetch(
-      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&hourly=precipitation_probability&daily=precipitation_probability_max&timezone=auto`
+      `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=precipitation_probability_max&timezone=auto&forecast_days=1`,
+      {
+        signal: AbortSignal.timeout(8000),
+      }
     );
-    const data = await response.json();
 
     if (!response.ok) {
       throw new Error("Weather data not available");
     }
 
-    // Get max precipitation probability for today
+    const data = await response.json();
     const maxPrecipitation = data.daily.precipitation_probability_max[0];
 
-    // Display result
+    // Cache the result
+    weatherCache.set(cacheKey, {
+      data: maxPrecipitation,
+      timestamp: Date.now(),
+    });
+
+    // Clean old cache entries periodically
+    if (weatherCache.size > 50) {
+      const now = Date.now();
+      for (let [key, value] of weatherCache.entries()) {
+        if (!isCacheValid(value.timestamp, WEATHER_CACHE_DURATION)) {
+          weatherCache.delete(key);
+        }
+      }
+    }
+
     displayResult(maxPrecipitation, "your location");
   } catch (error) {
     console.error("Error fetching weather data:", error);
@@ -209,6 +249,7 @@ async function getWeatherByCoords(lat, lon) {
   }
 }
 
+// Optimized city weather fetching
 async function getWeatherByCity() {
   const cityName = cityInput.value.trim();
 
@@ -217,7 +258,6 @@ async function getWeatherByCity() {
     return;
   }
 
-  // If there are current city suggestions, use the first one
   if (currentCities.length > 0) {
     const city = currentCities[0];
     selectCity(city.latitude, city.longitude, city.name);
@@ -227,25 +267,60 @@ async function getWeatherByCity() {
   loading.style.display = "block";
   result.style.display = "none";
 
+  // Check location cache first
+  const locationCacheKey = cityName.toLowerCase();
+  const cachedLocation = locationCache.get(locationCacheKey);
+
+  if (
+    cachedLocation &&
+    isCacheValid(cachedLocation.timestamp, LOCATION_CACHE_DURATION)
+  ) {
+    console.log("Using cached location data");
+    getWeatherByCoords(
+      cachedLocation.data.latitude,
+      cachedLocation.data.longitude
+    );
+    return;
+  }
+
   try {
     const geoResponse = await fetch(
       `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(
         cityName
-      )}&count=1&language=en&format=json`
+      )}&count=1&language=en&format=json`,
+      {
+        signal: AbortSignal.timeout(5000),
+      }
     );
+
+    if (!geoResponse.ok) {
+      throw new Error(`Geocoding failed: ${geoResponse.status}`);
+    }
+
     const geoData = await geoResponse.json();
 
     if (geoData.results && geoData.results.length > 0) {
-      const { latitude, longitude, name } = geoData.results[0];
-      getWeatherByCoords(latitude, longitude);
+      const location = geoData.results[0];
+
+      // Cache the location result
+      locationCache.set(locationCacheKey, {
+        data: location,
+        timestamp: Date.now(),
+      });
+
+      getWeatherByCoords(location.latitude, location.longitude);
     } else {
       showError("City not found. Please try another city name.");
+      loading.style.display = "none";
     }
   } catch (error) {
+    console.error("Geocoding error:", error);
     showError("Unable to find city. Please try again.");
+    loading.style.display = "none";
   }
 }
 
+// Optimized city search with caching
 async function searchCities(query) {
   const trimmedQuery = query.trim();
 
@@ -255,12 +330,39 @@ async function searchCities(query) {
     return;
   }
 
+  // Check cache for city search
+  const searchCacheKey = `search_${trimmedQuery.toLowerCase()}`;
+  const cachedSearch = locationCache.get(searchCacheKey);
+
+  if (
+    cachedSearch &&
+    isCacheValid(cachedSearch.timestamp, LOCATION_CACHE_DURATION)
+  ) {
+    const filteredResults = filterCitySuggestions(
+      cachedSearch.data,
+      trimmedQuery
+    );
+    currentCities = filteredResults;
+    if (filteredResults.length > 0) {
+      displaySuggestions(filteredResults);
+    } else {
+      suggestions.classList.add("hidden");
+    }
+    return;
+  }
+
   try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000);
+
     const response = await fetch(
       `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(
         trimmedQuery
-      )}&count=10&language=en&format=json`
+      )}&count=10&language=en&format=json`,
+      { signal: controller.signal }
     );
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       throw new Error(`HTTP ${response.status}`);
@@ -269,7 +371,12 @@ async function searchCities(query) {
     const data = await response.json();
 
     if (data.results && data.results.length > 0) {
-      // Filter out inappropriate results
+      // Cache search results
+      locationCache.set(searchCacheKey, {
+        data: data.results,
+        timestamp: Date.now(),
+      });
+
       const filteredResults = filterCitySuggestions(data.results, trimmedQuery);
       currentCities = filteredResults;
 
@@ -284,42 +391,45 @@ async function searchCities(query) {
       suggestions.classList.add("hidden");
     }
   } catch (error) {
-    console.error("Search error:", error);
+    if (error.name === "AbortError") {
+      console.log("Search request timed out");
+    } else {
+      console.error("Search error:", error);
+    }
     currentCities = [];
     suggestions.classList.add("hidden");
   }
 }
 
-// Filter out inappropriate city suggestions
+// Rest of functions remain the same...
 function filterCitySuggestions(results, query) {
   return results
     .filter((city) => {
-      // Filter out countries when searching for cities
       if (
         city.feature_code &&
-        (city.feature_code === "PCLI" || // Independent political entity (country)
-          city.feature_code === "PCLD" || // Dependent political entity
-          city.feature_code === "PCL" || // Political entity (general)
-          city.feature_code === "PCLS" || // Semi-independent political entity
-          city.feature_code === "TERR") // Territory
+        (city.feature_code === "PCLI" ||
+          city.feature_code === "PCLD" ||
+          city.feature_code === "PCL" ||
+          city.feature_code === "PCLS" ||
+          city.feature_code === "TERR")
       ) {
         return false;
       }
 
-      // Only apply the "same name, different country" filter for country names
-      // This prevents cases like "Australia" in Mexico, but allows "Richmond" in any country
       const isLikelyCountryQuery =
         query.length > 5 &&
-        (query.toLowerCase() === "australia" ||
-          query.toLowerCase() === "canada" ||
-          query.toLowerCase() === "germany" ||
-          query.toLowerCase() === "france" ||
-          query.toLowerCase() === "italy" ||
-          query.toLowerCase() === "spain" ||
-          query.toLowerCase() === "japan" ||
-          query.toLowerCase() === "brazil" ||
-          query.toLowerCase() === "india" ||
-          query.toLowerCase() === "china");
+        [
+          "australia",
+          "canada",
+          "germany",
+          "france",
+          "italy",
+          "spain",
+          "japan",
+          "brazil",
+          "india",
+          "china",
+        ].includes(query.toLowerCase());
 
       if (
         isLikelyCountryQuery &&
@@ -330,30 +440,27 @@ function filterCitySuggestions(results, query) {
         return false;
       }
 
-      // Prioritize actual cities and populated places
       if (
         city.feature_code &&
-        (city.feature_code === "PPL" || // Populated place
-          city.feature_code === "PPLA" || // Seat of a first-order administrative division
-          city.feature_code === "PPLA2" || // Seat of a second-order administrative division
-          city.feature_code === "PPLA3" || // Seat of a third-order administrative division
-          city.feature_code === "PPLA4" || // Seat of a fourth-order administrative division
-          city.feature_code === "PPLC") // Capital of a political entity
+        (city.feature_code === "PPL" ||
+          city.feature_code === "PPLA" ||
+          city.feature_code === "PPLA2" ||
+          city.feature_code === "PPLA3" ||
+          city.feature_code === "PPLA4" ||
+          city.feature_code === "PPLC")
       ) {
         return true;
       }
 
-      // Include other relevant place types
       if (
         city.feature_code &&
-        (city.feature_code === "ADM2" || // Second-order administrative division
-          city.feature_code === "ADM3" || // Third-order administrative division
-          city.feature_code === "ADM4") // Fourth-order administrative division
+        (city.feature_code === "ADM2" ||
+          city.feature_code === "ADM3" ||
+          city.feature_code === "ADM4")
       ) {
         return true;
       }
 
-      // Exclude other types of features
       return false;
     })
     .slice(0, 5);
@@ -422,10 +529,10 @@ function displayResult(precipitation, location) {
     animationType = "sun";
   }
 
-  // Create weather animation
+  // Set background and create animation
+  setWeatherBackground(animationType);
   createWeatherAnimation(animationType);
 
-  // Update the result display
   result.innerHTML = `
     <div class="icon">${iconHtml}</div>
     <div class="answer">${resultText}</div>
@@ -434,11 +541,7 @@ function displayResult(precipitation, location) {
 
   result.className = `result ${resultClass}`;
   result.style.display = "block";
-
-  // Update page title with result
   document.title = `${resultText} - Umbrella?`;
-
-  setWeatherBackground(animationType);
 }
 
 function displayError() {
@@ -452,34 +555,8 @@ function displayError() {
 }
 
 function showError(message) {
-  result.innerHTML = `
-    <div class="error">${message}</div>
-  `;
+  result.innerHTML = `<div class="error">${message}</div>`;
   result.style.display = "block";
 }
 
-function setWeatherBackground(animationType) {
-  const body = document.body;
-
-  // Remove all weather background classes
-  body.classList.remove("rainy-bg", "sunny-bg", "cloudy-bg");
-
-  // Add the appropriate background class
-  switch (animationType) {
-    case "rain":
-      body.classList.add("rainy-bg");
-      break;
-    case "sun":
-      body.classList.add("sunny-bg");
-      break;
-    case "clouds":
-      body.classList.add("cloudy-bg");
-      break;
-    default:
-      // Keep default background
-      break;
-  }
-}
-
-// Create debounced search function
-const debouncedSearch = debounce(searchCities, 150);
+const debouncedSearch = debounce(searchCities, 300);
