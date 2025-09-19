@@ -290,7 +290,6 @@ async function searchCities(query) {
 }
 
 // Filter out inappropriate city suggestions
-// Filter out inappropriate city suggestions
 function filterCitySuggestions(results, query) {
   return results
     .filter((city) => {
@@ -356,7 +355,7 @@ function filterCitySuggestions(results, query) {
       // Exclude other types of features
       return false;
     })
-    .slice(0, 5);
+    .slice(0, 5); // Limit to 5 results
 }
 
 function displaySuggestions(cities) {
