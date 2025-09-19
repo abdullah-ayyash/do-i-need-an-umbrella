@@ -12,86 +12,100 @@ body {
   justify-content: center;
   align-items: center;
   padding: 20px;
-  overflow: hidden;
   position: relative;
+  transition: background 1s ease-in-out;
 }
 
-/* Weather animations */
+body.rainy-bg {
+  background: linear-gradient(135deg, #2c3e50, #34495e);
+}
+
+body.sunny-bg {
+  background: linear-gradient(135deg, #87ceeb, #e0f6ff);
+}
+
+body.cloudy-bg {
+  background: linear-gradient(135deg, #bdc3c7, #2c3e50);
+}
+
 .weather-animation {
-  position: absolute;
+  position: fixed;
   top: 0;
   left: 0;
-  width: 100%;
-  height: 100%;
+  width: 100vw;
+  height: 100vh;
   pointer-events: none;
-  z-index: -1;
+  z-index: 0;
 }
 
-/* Rain animation */
 .rain {
   position: absolute;
   width: 100%;
   height: 100%;
+  overflow: hidden;
 }
 
 .drop {
   position: absolute;
   width: 2px;
   height: 15px;
-  background: linear-gradient(transparent, #6dd5ed);
-  border-radius: 0 0 5px 5px;
+  background: linear-gradient(to bottom, transparent, #87ceeb, #4682b4);
+  border-radius: 0 0 2px 2px;
   animation: rain 1.5s linear infinite;
-  opacity: 0.6;
+  will-change: transform;
+  box-shadow: 0 0 3px rgba(135, 206, 235, 0.8);
 }
 
 @keyframes rain {
   0% {
-    transform: translateY(-100px);
+    transform: translateY(-20px);
     opacity: 0;
   }
   10% {
-    opacity: 0.6;
+    opacity: 0.8;
   }
   90% {
-    opacity: 0.6;
+    opacity: 0.8;
   }
   100% {
-    transform: translateY(calc(100vh + 100px));
+    transform: translateY(calc(100vh + 20px));
     opacity: 0;
   }
 }
 
-/* Sun animation */
 .sun {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  width: 80px;
-  height: 80px;
-  background: #ffde65;
+  position: fixed;
+  top: 20%;
+  right: 20%;
+  width: 100px;
+  height: 100px;
+  background: radial-gradient(circle, #ffde65 30%, #ffa500 70%);
   border-radius: 50%;
-  box-shadow: 0 0 50px #ffde65, 0 0 100px #ffde65;
-  animation: pulseSun 3s infinite alternate;
+  box-shadow: 0 0 30px rgba(255, 222, 101, 0.6);
+  animation: pulseSun 4s ease-in-out infinite alternate;
+  will-change: transform, box-shadow;
 }
 
 .sun-ray {
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 120px;
-  height: 5px;
-  background: #ffde65;
-  transform-origin: 0 0;
+  width: 150px;
+  height: 4px;
+  background: linear-gradient(90deg, #ffde65, transparent);
+  transform-origin: 0 50%;
   animation: rotateRay 20s linear infinite;
+  border-radius: 2px;
 }
 
 @keyframes pulseSun {
   0% {
-    box-shadow: 0 0 50px #ffde65, 0 0 100px #ffde65;
+    transform: scale(1);
+    box-shadow: 0 0 30px rgba(255, 222, 101, 0.6);
   }
   100% {
-    box-shadow: 0 0 70px #ffde65, 0 0 140px #ffde65;
+    transform: scale(1.1);
+    box-shadow: 0 0 50px rgba(255, 222, 101, 0.8);
   }
 }
 
@@ -104,27 +118,52 @@ body {
   }
 }
 
-/* Clouds animation */
 .clouds {
   position: absolute;
   width: 100%;
   height: 100%;
+  overflow: hidden;
 }
 
 .cloud {
   position: absolute;
+  background: rgba(255, 255, 255, 0.7);
+  border-radius: 50px;
+  filter: blur(8px);
+  animation: float linear infinite;
+  will-change: transform;
+}
+
+.cloud:before {
+  content: "";
+  position: absolute;
+  top: -50%;
+  left: 10%;
+  width: 60%;
+  height: 60%;
   background: rgba(255, 255, 255, 0.8);
-  border-radius: 50%;
-  filter: blur(10px);
-  animation: float 30s linear infinite;
+  border-radius: 50px;
+  filter: blur(5px);
+}
+
+.cloud:after {
+  content: "";
+  position: absolute;
+  top: -30%;
+  right: 10%;
+  width: 40%;
+  height: 40%;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 50px;
+  filter: blur(3px);
 }
 
 @keyframes float {
   0% {
-    transform: translateX(-100px);
+    transform: translateX(-150px);
   }
   100% {
-    transform: translateX(calc(100vw + 100px));
+    transform: translateX(calc(100vw + 150px));
   }
 }
 
@@ -138,7 +177,8 @@ body {
   text-align: center;
   transition: all 0.3s ease;
   position: relative;
-  z-index: 1;
+  z-index: 10;
+  backdrop-filter: blur(10px);
 }
 
 h1 {
@@ -300,7 +340,6 @@ button:hover {
   border-radius: 8px;
 }
 
-/* City suggestions styling */
 .suggestions {
   position: absolute;
   top: 100%;
@@ -309,7 +348,7 @@ button:hover {
   background: white;
   border-radius: 0 0 10px 10px;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-  z-index: 10;
+  z-index: 20;
   max-height: 200px;
   overflow-y: auto;
   margin-top: 2px;
@@ -340,4 +379,23 @@ button:hover {
 
 .hidden {
   display: none;
+}
+
+@media (max-width: 768px) {
+  .container {
+    margin: 10px;
+    padding: 20px;
+  }
+
+  .sun {
+    width: 80px;
+    height: 80px;
+    top: 15%;
+    right: 15%;
+  }
+
+  .sun-ray {
+    width: 120px;
+    height: 3px;
+  }
 }

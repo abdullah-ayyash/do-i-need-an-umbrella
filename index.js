@@ -100,6 +100,7 @@ function createRainAnimation(container) {
     const drop = document.createElement("div");
     drop.className = "drop";
     drop.style.left = `${Math.random() * 100}%`;
+    drop.style.top = `-20px`;
     drop.style.animationDelay = `${Math.random() * 2}s`;
     drop.style.animationDuration = `${1 + Math.random() * 0.5}s`;
     rainContainer.appendChild(drop);
@@ -355,7 +356,7 @@ function filterCitySuggestions(results, query) {
       // Exclude other types of features
       return false;
     })
-    .slice(0, 5); // Limit to 5 results
+    .slice(0, 5);
 }
 
 function displaySuggestions(cities) {
@@ -436,6 +437,8 @@ function displayResult(precipitation, location) {
 
   // Update page title with result
   document.title = `${resultText} - Umbrella?`;
+
+  setWeatherBackground(animationType);
 }
 
 function displayError() {
@@ -453,6 +456,29 @@ function showError(message) {
     <div class="error">${message}</div>
   `;
   result.style.display = "block";
+}
+
+function setWeatherBackground(animationType) {
+  const body = document.body;
+
+  // Remove all weather background classes
+  body.classList.remove("rainy-bg", "sunny-bg", "cloudy-bg");
+
+  // Add the appropriate background class
+  switch (animationType) {
+    case "rain":
+      body.classList.add("rainy-bg");
+      break;
+    case "sun":
+      body.classList.add("sunny-bg");
+      break;
+    case "clouds":
+      body.classList.add("cloudy-bg");
+      break;
+    default:
+      // Keep default background
+      break;
+  }
 }
 
 // Create debounced search function
