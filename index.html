@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Umbrella? - Weather Check</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <link rel="stylesheet" type="text/css" href="styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <h1><i class="fas fa-umbrella"></i> Umbrella?</h1>
+      <p class="description">
+        Find out if you need an umbrella today based on real weather data.
+      </p>
+
+      <div class="loading" id="loading">
+        <div class="spinner"></div>
+        <p>Checking your location...</p>
+      </div>
+
+      <div class="location-prompt" id="location-prompt">
+        <i class="fas fa-map-marker-alt"></i>
+        <p>Please allow location access to check weather automatically</p>
+      </div>
+
+      <div class="permission-denied" id="permission-denied">
+        <p>
+          <i class="fas fa-exclamation-circle"></i> Location access denied.
+          Please enter your city manually.
+        </p>
+      </div>
+
+      <div class="input-section" id="input-section">
+        <div class="input-group">
+          <input
+            type="text"
+            id="city-input"
+            placeholder="Enter your city name"
+            autocomplete="off"
+          />
+          <div id="suggestions" class="suggestions hidden"></div>
+        </div>
+
+        <button id="check-btn">
+          <i class="fas fa-search"></i> Check Weather
+        </button>
+      </div>
+
+      <div class="result" id="result">
+        <!-- Result will be populated dynamically -->
+      </div>
+
+      <div class="footer">
+        <p>Uses real weather data from Open-Meteo API</p>
+        <p class="credit">Data provided by Open-Meteo.com</p>
+      </div>
+    </div>
+
+    <script src="index.js"></script>
+  </body>
+</html>
