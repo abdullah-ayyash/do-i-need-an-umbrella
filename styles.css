@@ -12,6 +12,120 @@ body {
   justify-content: center;
   align-items: center;
   padding: 20px;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Weather animations */
+.weather-animation {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: -1;
+}
+
+/* Rain animation */
+.rain {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+}
+
+.drop {
+  position: absolute;
+  width: 2px;
+  height: 15px;
+  background: linear-gradient(transparent, #6dd5ed);
+  border-radius: 0 0 5px 5px;
+  animation: rain 1.5s linear infinite;
+  opacity: 0.6;
+}
+
+@keyframes rain {
+  0% {
+    transform: translateY(-100px);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.6;
+  }
+  90% {
+    opacity: 0.6;
+  }
+  100% {
+    transform: translateY(calc(100vh + 100px));
+    opacity: 0;
+  }
+}
+
+/* Sun animation */
+.sun {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 80px;
+  height: 80px;
+  background: #ffde65;
+  border-radius: 50%;
+  box-shadow: 0 0 50px #ffde65, 0 0 100px #ffde65;
+  animation: pulseSun 3s infinite alternate;
+}
+
+.sun-ray {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 120px;
+  height: 5px;
+  background: #ffde65;
+  transform-origin: 0 0;
+  animation: rotateRay 20s linear infinite;
+}
+
+@keyframes pulseSun {
+  0% {
+    box-shadow: 0 0 50px #ffde65, 0 0 100px #ffde65;
+  }
+  100% {
+    box-shadow: 0 0 70px #ffde65, 0 0 140px #ffde65;
+  }
+}
+
+@keyframes rotateRay {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+/* Clouds animation */
+.clouds {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+}
+
+.cloud {
+  position: absolute;
+  background: rgba(255, 255, 255, 0.8);
+  border-radius: 50%;
+  filter: blur(10px);
+  animation: float 30s linear infinite;
+}
+
+@keyframes float {
+  0% {
+    transform: translateX(-100px);
+  }
+  100% {
+    transform: translateX(calc(100vw + 100px));
+  }
 }
 
 .container {
@@ -24,6 +138,7 @@ body {
   text-align: center;
   transition: all 0.3s ease;
   position: relative;
+  z-index: 1;
 }
 
 h1 {

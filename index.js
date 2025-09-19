@@ -1,5 +1,6 @@
 // Global variables
 let currentCities = [];
+let currentAnimation = null;
 
 // DOM elements
 const loading = document.getElementById("loading");
@@ -68,6 +69,86 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
 });
+
+// Create weather animation based on precipitation
+function createWeatherAnimation(type) {
+  // Remove any existing animation
+  removeWeatherAnimation();
+
+  const animationContainer = document.createElement("div");
+  animationContainer.className = "weather-animation";
+  document.body.appendChild(animationContainer);
+  currentAnimation = animationContainer;
+
+  if (type === "rain") {
+    createRainAnimation(animationContainer);
+  } else if (type === "sun") {
+    createSunAnimation(animationContainer);
+  } else if (type === "clouds") {
+    createCloudsAnimation(animationContainer);
+  }
+}
+
+// Create rain animation
+function createRainAnimation(container) {
+  const rainContainer = document.createElement("div");
+  rainContainer.className = "rain";
+  container.appendChild(rainContainer);
+
+  // Create raindrops
+  for (let i = 0; i < 80; i++) {
+    const drop = document.createElement("div");
+    drop.className = "drop";
+    drop.style.left = `${Math.random() * 100}%`;
+    drop.style.animationDelay = `${Math.random() * 2}s`;
+    drop.style.animationDuration = `${1 + Math.random() * 0.5}s`;
+    rainContainer.appendChild(drop);
+  }
+}
+
+// Create sun animation
+function createSunAnimation(container) {
+  const sun = document.createElement("div");
+  sun.className = "sun";
+  container.appendChild(sun);
+
+  // Create sun rays
+  for (let i = 0; i < 12; i++) {
+    const ray = document.createElement("div");
+    ray.className = "sun-ray";
+    ray.style.transform = `rotate(${i * 30}deg)`;
+    container.appendChild(ray);
+  }
+}
+
+// Create clouds animation
+function createCloudsAnimation(container) {
+  const cloudsContainer = document.createElement("div");
+  cloudsContainer.className = "clouds";
+  container.appendChild(cloudsContainer);
+
+  // Create clouds
+  for (let i = 0; i < 6; i++) {
+    const cloud = document.createElement("div");
+    cloud.className = "cloud";
+    cloud.style.width = `${60 + Math.random() * 80}px`;
+    cloud.style.height = `${40 + Math.random() * 40}px`;
+    cloud.style.top = `${Math.random() * 80}%`;
+    cloud.style.left = `${Math.random() * 20}%`;
+    cloud.style.opacity = `${0.3 + Math.random() * 0.4}`;
+    cloud.style.animationDelay = `${Math.random() * 20}s`;
+    cloud.style.animationDuration = `${20 + Math.random() * 40}s`;
+    cloudsContainer.appendChild(cloud);
+  }
+}
+
+// Remove weather animation
+function removeWeatherAnimation() {
+  if (currentAnimation) {
+    document.body.removeChild(currentAnimation);
+    currentAnimation = null;
+  }
+}
 
 function requestLocation() {
   if ("geolocation" in navigator) {
@@ -177,7 +258,7 @@ async function searchCities(query) {
     const response = await fetch(
       `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(
         trimmedQuery
-      )}&count=5&language=en&format=json`
+      )}&count=10&language=en&format=json`
     );
 
     if (!response.ok) {
@@ -187,8 +268,16 @@ async function searchCities(query) {
     const data = await response.json();
 
     if (data.results && data.results.length > 0) {
-      currentCities = data.results;
-      displaySuggestions(data.results);
+      // Filter out inappropriate results
+      const filteredResults = filterCitySuggestions(data.results, trimmedQuery);
+      currentCities = filteredResults;
+
+      if (filteredResults.length > 0) {
+        displaySuggestions(filteredResults);
+      } else {
+        currentCities = [];
+        suggestions.classList.add("hidden");
+      }
     } else {
       currentCities = [];
       suggestions.classList.add("hidden");
@@ -200,17 +289,94 @@ async function searchCities(query) {
   }
 }
 
+// Filter out inappropriate city suggestions
+// Filter out inappropriate city suggestions
+function filterCitySuggestions(results, query) {
+  return results
+    .filter((city) => {
+      // Filter out countries when searching for cities
+      if (
+        city.feature_code &&
+        (city.feature_code === "PCLI" || // Independent political entity (country)
+          city.feature_code === "PCLD" || // Dependent political entity
+          city.feature_code === "PCL" || // Political entity (general)
+          city.feature_code === "PCLS" || // Semi-independent political entity
+          city.feature_code === "TERR") // Territory
+      ) {
+        return false;
+      }
+
+      // Only apply the "same name, different country" filter for country names
+      // This prevents cases like "Australia" in Mexico, but allows "Richmond" in any country
+      const isLikelyCountryQuery =
+        query.length > 5 &&
+        (query.toLowerCase() === "australia" ||
+          query.toLowerCase() === "canada" ||
+          query.toLowerCase() === "germany" ||
+          query.toLowerCase() === "france" ||
+          query.toLowerCase() === "italy" ||
+          query.toLowerCase() === "spain" ||
+          query.toLowerCase() === "japan" ||
+          query.toLowerCase() === "brazil" ||
+          query.toLowerCase() === "india" ||
+          query.toLowerCase() === "china");
+
+      if (
+        isLikelyCountryQuery &&
+        city.name.toLowerCase() === query.toLowerCase() &&
+        city.country &&
+        city.country.toLowerCase() !== query.toLowerCase()
+      ) {
+        return false;
+      }
+
+      // Prioritize actual cities and populated places
+      if (
+        city.feature_code &&
+        (city.feature_code === "PPL" || // Populated place
+          city.feature_code === "PPLA" || // Seat of a first-order administrative division
+          city.feature_code === "PPLA2" || // Seat of a second-order administrative division
+          city.feature_code === "PPLA3" || // Seat of a third-order administrative division
+          city.feature_code === "PPLA4" || // Seat of a fourth-order administrative division
+          city.feature_code === "PPLC") // Capital of a political entity
+      ) {
+        return true;
+      }
+
+      // Include other relevant place types
+      if (
+        city.feature_code &&
+        (city.feature_code === "ADM2" || // Second-order administrative division
+          city.feature_code === "ADM3" || // Third-order administrative division
+          city.feature_code === "ADM4") // Fourth-order administrative division
+      ) {
+        return true;
+      }
+
+      // Exclude other types of features
+      return false;
+    })
+    .slice(0, 5);
+}
+
 function displaySuggestions(cities) {
   const suggestionsHTML = cities
     .map((city, index) => {
+      const displayName = city.name;
+      let displayLocation = "";
+
+      if (city.admin1 && city.country) {
+        displayLocation = `${city.admin1}, ${city.country}`;
+      } else if (city.country) {
+        displayLocation = city.country;
+      }
+
       return `
-                        <div class="suggestion-item" onclick="selectCityByIndex(${index})">
-                            <div class="city-name">${city.name}</div>
-                            <div class="country-name">${
-                              city.country || city.admin1 || ""
-                            }</div>
-                        </div>
-                    `;
+        <div class="suggestion-item" onclick="selectCityByIndex(${index})">
+          <div class="city-name">${displayName}</div>
+          <div class="country-name">${displayLocation}</div>
+        </div>
+      `;
     })
     .join("");
 
@@ -234,31 +400,37 @@ function selectCity(lat, lon, name) {
 }
 
 function displayResult(precipitation, location) {
-  let resultText, resultClass, iconHtml, detailText;
+  let resultText, resultClass, iconHtml, detailText, animationType;
 
   if (precipitation > 50) {
     resultText = "YES";
     resultClass = "yes";
     iconHtml = '<i class="fas fa-cloud-rain"></i>';
     detailText = `High chance of rain (${precipitation}%) today in ${location}. Don't forget your umbrella!`;
+    animationType = "rain";
   } else if (precipitation > 20) {
     resultText = "MAYBE";
     resultClass = "maybe";
     iconHtml = '<i class="fas fa-cloud-sun"></i>';
     detailText = `${precipitation}% chance of rain today in ${location}. You might need an umbrella.`;
+    animationType = "clouds";
   } else {
     resultText = "NO";
     resultClass = "no";
     iconHtml = '<i class="fas fa-sun"></i>';
     detailText = `Low chance of rain (${precipitation}%) today in ${location}. Enjoy your day!`;
+    animationType = "sun";
   }
+
+  // Create weather animation
+  createWeatherAnimation(animationType);
 
   // Update the result display
   result.innerHTML = `
-                <div class="icon">${iconHtml}</div>
-                <div class="answer">${resultText}</div>
-                <div class="details">${detailText}</div>
-            `;
+    <div class="icon">${iconHtml}</div>
+    <div class="answer">${resultText}</div>
+    <div class="details">${detailText}</div>
+  `;
 
   result.className = `result ${resultClass}`;
   result.style.display = "block";
@@ -269,18 +441,18 @@ function displayResult(precipitation, location) {
 
 function displayError() {
   result.innerHTML = `
-                <div class="icon"><i class="fas fa-exclamation-triangle"></i></div>
-                <div class="answer">ERROR</div>
-                <div class="details">Could not fetch weather data. Please try again later.</div>
-            `;
+    <div class="icon"><i class="fas fa-exclamation-triangle"></i></div>
+    <div class="answer">ERROR</div>
+    <div class="details">Could not fetch weather data. Please try again later.</div>
+  `;
   result.className = "result maybe";
   result.style.display = "block";
 }
 
 function showError(message) {
   result.innerHTML = `
-                <div class="error">${message}</div>
-            `;
+    <div class="error">${message}</div>
+  `;
   result.style.display = "block";
 }
 
