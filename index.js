@@ -43,17 +43,17 @@ function isCacheValid(timestamp, duration) {
 // Background switching function
 function setWeatherBackground(animationType) {
   const body = document.body;
-  body.classList.remove('rainy-bg', 'sunny-bg', 'cloudy-bg');
-  
-  switch(animationType) {
-    case 'rain':
-      body.classList.add('rainy-bg');
+  body.classList.remove("rainy-bg", "sunny-bg", "cloudy-bg");
+
+  switch (animationType) {
+    case "rain":
+      body.classList.add("rainy-bg");
       break;
-    case 'sun':
-      body.classList.add('sunny-bg');
+    case "sun":
+      body.classList.add("sunny-bg");
       break;
-    case 'clouds':
-      body.classList.add('cloudy-bg');
+    case "clouds":
+      body.classList.add("cloudy-bg");
       break;
   }
 }
@@ -167,70 +167,263 @@ function removeWeatherAnimation() {
   }
 }
 
-// Add browser detection function
-function getBrowserInfo() {
+// Enhanced browser detection function
+function getBrowserContext() {
   const ua = navigator.userAgent;
-  const isWebView = /wv|WebView/i.test(ua);
-  const isCustomTab = ua.includes('Chrome') && !ua.includes('Safari');
-  const isStandalone = window.navigator.standalone;
-  
+  const platform = navigator.platform;
+
+  // Detect various browser contexts
+  const isWebView =
+    /wv|WebView/i.test(ua) ||
+    (ua.includes("Chrome") && !ua.includes("Version") && ua.includes("Mobile"));
+  const isCustomTab = ua.includes("customtabs");
+  const isStandalone = window.navigator.standalone === true;
+  const isMobile = /Mobi|Android|iPhone|iPad/i.test(ua);
+  const isDesktop =
+    !isMobile &&
+    (platform.includes("Win") ||
+      platform.includes("Mac") ||
+      platform.includes("Linux"));
+  const isChrome = /Chrome/.test(ua) && !/Edge|OPR|Opera/.test(ua);
+  const isSafari = /Safari/.test(ua) && !/Chrome|Chromium/.test(ua);
+  const isFirefox = /Firefox/.test(ua);
+  const isIOS = /iPhone|iPad|iPod/.test(ua);
+  const isAndroid = /Android/.test(ua);
+
+  // Detect specific WebView contexts
+  const isFacebookApp = /FBAN|FBAV/.test(ua);
+  const isInstagramApp = /Instagram/.test(ua);
+  const isTwitterApp = /TwitterAndroid/.test(ua);
+  const isLinkedInApp = /LinkedInApp/.test(ua);
+
   return {
     userAgent: ua,
-    isWebView: isWebView,
-    isCustomTab: isCustomTab,
-    isStandalone: isStandalone,
-    isMobile: /Mobi|Android/i.test(ua),
-    isChrome: /Chrome/.test(ua) && !/Edge/.test(ua)
+    isWebView,
+    isCustomTab,
+    isStandalone,
+    isMobile,
+    isDesktop,
+    isChrome,
+    isSafari,
+    isFirefox,
+    isIOS,
+    isAndroid,
+    isFacebookApp,
+    isInstagramApp,
+    isTwitterApp,
+    isLinkedInApp,
+    // Categorize for easy logic
+    category: getContextCategory(),
   };
-}
 
-function requestLocation() {
-  // Debug: Log browser context
-  const browserInfo = getBrowserInfo();
-  console.log('Browser context:', browserInfo);
-  
-  if ("geolocation" in navigator) {
-    // Adjust timeout based on browser context
-    let timeout = 10000;
-    let maxAge = 600000;
-    
-    // WebView is often slower and has limited location access
-    if (browserInfo.isWebView) {
-      timeout = 15000; // Longer timeout for WebView
-      maxAge = 1800000; // Accept older cache (30 min)
-      console.log('WebView detected - using longer timeout');
-    }
-    
-    navigator.geolocation.getCurrentPosition(
-      function (position) {
-        loading.style.display = "block";
-        locationPrompt.style.display = "none";
-        getWeatherByCoords(position.coords.latitude, position.coords.longitude);
-      },
-      function (error) {
-        console.log("Geolocation failed:", error.code, "Browser:", browserInfo.isWebView ? 'WebView' : 'Native');
-        handleLocationError();
-      },
-      {
-        timeout: timeout,
-        enableHighAccuracy: false,
-        maximumAge: maxAge,
-      }
-    );
-  } else {
-    loading.style.display = "none";
-    locationPrompt.style.display = "none";
-    permissionDenied.innerHTML =
-      '<p><i class="fas fa-exclamation-circle"></i> Geolocation is not supported by your browser. Please enter your city manually.</p>';
-    permissionDenied.style.display = "block";
-    inputSection.style.display = "block";
-    result.style.display = "none";
+  function getContextCategory() {
+    if (isDesktop) return "desktop";
+    if (isFacebookApp || isInstagramApp || isTwitterApp || isLinkedInApp)
+      return "social-webview";
+    if (isWebView) return "webview";
+    if (isStandalone) return "pwa";
+    if (isMobile) return "mobile-browser";
+    return "unknown";
   }
 }
 
-function handleLocationError() {
+// Get optimal geolocation settings based on browser context
+function getLocationSettings(context) {
+  const settings = {
+    desktop: {
+      timeout: 5000,
+      enableHighAccuracy: false,
+      maximumAge: 300000, // 5 minutes
+      retryDelay: 1000,
+      maxRetries: 1,
+      strategy: "wifi-first", // Desktops use WiFi/IP location
+    },
+    "mobile-browser": {
+      timeout: 8000,
+      enableHighAccuracy: false,
+      maximumAge: 600000, // 10 minutes
+      retryDelay: 1500,
+      maxRetries: 2,
+      strategy: "balanced", // Mix of cached and network location
+    },
+    webview: {
+      timeout: 12000,
+      enableHighAccuracy: false,
+      maximumAge: 1800000, // 30 minutes - very permissive
+      retryDelay: 2000,
+      maxRetries: 2,
+      strategy: "cache-heavy", // Rely heavily on cached location
+    },
+    "social-webview": {
+      timeout: 15000,
+      enableHighAccuracy: false,
+      maximumAge: 3600000, // 1 hour - extremely permissive
+      retryDelay: 3000,
+      maxRetries: 1,
+      strategy: "cache-only", // Social apps often restrict location heavily
+    },
+    pwa: {
+      timeout: 6000,
+      enableHighAccuracy: false,
+      maximumAge: 600000, // 10 minutes
+      retryDelay: 1000,
+      maxRetries: 2,
+      strategy: "optimized", // PWAs have good browser integration
+    },
+    unknown: {
+      timeout: 10000,
+      enableHighAccuracy: false,
+      maximumAge: 600000, // 10 minutes
+      retryDelay: 2000,
+      maxRetries: 1,
+      strategy: "conservative",
+    },
+  };
+
+  return settings[context.category] || settings.unknown;
+}
+
+function requestLocation() {
+  const browserContext = getBrowserContext();
+  const locationSettings = getLocationSettings(browserContext);
+
+  // Log context for debugging
+  console.log("🌍 Browser Context:", {
+    category: browserContext.category,
+    isWebView: browserContext.isWebView,
+    isMobile: browserContext.isMobile,
+    settings: locationSettings,
+  });
+
+  // Show different loading messages based on context
+  updateLoadingMessage(browserContext);
+
+  if ("geolocation" in navigator) {
+    attemptLocation(locationSettings, 0);
+  } else {
+    handleGeolocationNotSupported();
+  }
+}
+
+function updateLoadingMessage(context) {
+  const loadingText = document.querySelector("#loading p");
+  if (loadingText) {
+    switch (context.category) {
+      case "desktop":
+        loadingText.textContent = "Getting your location...";
+        break;
+      case "webview":
+      case "social-webview":
+        loadingText.textContent = "Checking location permissions...";
+        break;
+      case "mobile-browser":
+        loadingText.textContent = "Finding your location...";
+        break;
+      default:
+        loadingText.textContent = "Checking your location...";
+    }
+  }
+}
+
+function attemptLocation(settings, retryCount) {
+  navigator.geolocation.getCurrentPosition(
+    function (position) {
+      // Success
+      console.log("✅ Location success on attempt", retryCount + 1);
+      loading.style.display = "block";
+      locationPrompt.style.display = "none";
+      getWeatherByCoords(position.coords.latitude, position.coords.longitude);
+    },
+    function (error) {
+      console.log(`❌ Location attempt ${retryCount + 1} failed:`, {
+        code: error.code,
+        message: error.message,
+        strategy: settings.strategy,
+      });
+
+      // Handle different error types
+      handleLocationError(error, settings, retryCount);
+    },
+    {
+      timeout: settings.timeout,
+      enableHighAccuracy: settings.enableHighAccuracy,
+      maximumAge: settings.maximumAge,
+    }
+  );
+}
+
+function handleLocationError(error, settings, retryCount) {
+  // Should we retry?
+  if (retryCount < settings.maxRetries) {
+    console.log(`🔄 Retrying location in ${settings.retryDelay}ms...`);
+
+    setTimeout(() => {
+      // For retries, use even more permissive settings
+      const retrySettings = {
+        ...settings,
+        timeout: settings.timeout + 3000, // Longer timeout
+        maximumAge: settings.maximumAge * 2, // Accept older cache
+      };
+      attemptLocation(retrySettings, retryCount + 1);
+    }, settings.retryDelay);
+
+    return;
+  }
+
+  // All attempts failed
+  console.log("🚫 All location attempts failed");
+
+  // Show context-specific error messages
+  showContextualError(error, settings);
+}
+
+function showContextualError(error, settings) {
   loading.style.display = "none";
   locationPrompt.style.display = "none";
+  permissionDenied.style.display = "block";
+  inputSection.style.display = "block";
+  result.style.display = "none";
+
+  // Customize error message based on context and error type
+  let errorMessage = "";
+
+  if (error.code === 1) {
+    // PERMISSION_DENIED
+    switch (settings.strategy) {
+      case "cache-only":
+      case "social-webview":
+        errorMessage =
+          '<p><i class="fas fa-exclamation-circle"></i> Location access limited in this app. Please enter your city manually.</p>';
+        break;
+      case "cache-heavy":
+        errorMessage =
+          '<p><i class="fas fa-exclamation-circle"></i> Location permission denied. Please allow location access or enter your city.</p>';
+        break;
+      default:
+        errorMessage =
+          '<p><i class="fas fa-exclamation-circle"></i> Location access denied. Please enter your city manually.</p>';
+    }
+  } else if (error.code === 2) {
+    // POSITION_UNAVAILABLE
+    errorMessage =
+      '<p><i class="fas fa-exclamation-circle"></i> Unable to determine location. Please enter your city manually.</p>';
+  } else if (error.code === 3) {
+    // TIMEOUT
+    errorMessage =
+      '<p><i class="fas fa-exclamation-circle"></i> Location request timed out. Please enter your city manually.</p>';
+  } else {
+    errorMessage =
+      '<p><i class="fas fa-exclamation-circle"></i> Could not get location. Please enter your city manually.</p>';
+  }
+
+  permissionDenied.innerHTML = errorMessage;
+}
+
+function handleGeolocationNotSupported() {
+  loading.style.display = "none";
+  locationPrompt.style.display = "none";
+  permissionDenied.innerHTML =
+    '<p><i class="fas fa-exclamation-circle"></i> Geolocation is not supported by your browser. Please enter your city manually.</p>';
   permissionDenied.style.display = "block";
   inputSection.style.display = "block";
   result.style.display = "none";
@@ -238,17 +431,21 @@ function handleLocationError() {
 
 function isMobileChrome() {
   const userAgent = navigator.userAgent;
-  return /Chrome/.test(userAgent) && /Mobile/.test(userAgent) && !/Edge/.test(userAgent);
+  return (
+    /Chrome/.test(userAgent) &&
+    /Mobile/.test(userAgent) &&
+    !/Edge/.test(userAgent)
+  );
 }
 
 // Optimized weather fetching with caching
 async function getWeatherByCoords(lat, lon) {
   const cacheKey = getCacheKey(lat, lon);
   const cached = weatherCache.get(cacheKey);
-  
+
   // Check if we have valid cached data
   if (cached && isCacheValid(cached.timestamp, WEATHER_CACHE_DURATION)) {
-    console.log('Using cached weather data');
+    console.log("Using cached weather data");
     displayResult(cached.data, "your location");
     loading.style.display = "none";
     return;
@@ -259,23 +456,23 @@ async function getWeatherByCoords(lat, lon) {
     const response = await fetch(
       `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=precipitation_probability_max&timezone=auto&forecast_days=1`,
       {
-        signal: AbortSignal.timeout(8000) // 8 second timeout
+        signal: AbortSignal.timeout(8000), // 8 second timeout
       }
     );
-    
+
     if (!response.ok) {
       throw new Error("Weather data not available");
     }
-    
+
     const data = await response.json();
     const maxPrecipitation = data.daily.precipitation_probability_max[0];
-    
+
     // Cache the result
     weatherCache.set(cacheKey, {
       data: maxPrecipitation,
-      timestamp: Date.now()
+      timestamp: Date.now(),
     });
-    
+
     // Clean old cache entries periodically
     if (weatherCache.size > 50) {
       const now = Date.now();
@@ -316,10 +513,16 @@ async function getWeatherByCity() {
   // Check location cache first
   const locationCacheKey = cityName.toLowerCase();
   const cachedLocation = locationCache.get(locationCacheKey);
-  
-  if (cachedLocation && isCacheValid(cachedLocation.timestamp, LOCATION_CACHE_DURATION)) {
-    console.log('Using cached location data');
-    getWeatherByCoords(cachedLocation.data.latitude, cachedLocation.data.longitude);
+
+  if (
+    cachedLocation &&
+    isCacheValid(cachedLocation.timestamp, LOCATION_CACHE_DURATION)
+  ) {
+    console.log("Using cached location data");
+    getWeatherByCoords(
+      cachedLocation.data.latitude,
+      cachedLocation.data.longitude
+    );
     return;
   }
 
@@ -329,25 +532,25 @@ async function getWeatherByCity() {
         cityName
       )}&count=1&language=en&format=json`,
       {
-        signal: AbortSignal.timeout(5000) // 5 second timeout
+        signal: AbortSignal.timeout(5000), // 5 second timeout
       }
     );
-    
+
     if (!geoResponse.ok) {
       throw new Error(`Geocoding failed: ${geoResponse.status}`);
     }
-    
+
     const geoData = await geoResponse.json();
 
     if (geoData.results && geoData.results.length > 0) {
       const location = geoData.results[0];
-      
+
       // Cache the location result
       locationCache.set(locationCacheKey, {
         data: location,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
-      
+
       getWeatherByCoords(location.latitude, location.longitude);
     } else {
       showError("City not found. Please try another city name.");
@@ -373,9 +576,15 @@ async function searchCities(query) {
   // Check cache for city search
   const searchCacheKey = `search_${trimmedQuery.toLowerCase()}`;
   const cachedSearch = locationCache.get(searchCacheKey);
-  
-  if (cachedSearch && isCacheValid(cachedSearch.timestamp, LOCATION_CACHE_DURATION)) {
-    const filteredResults = filterCitySuggestions(cachedSearch.data, trimmedQuery);
+
+  if (
+    cachedSearch &&
+    isCacheValid(cachedSearch.timestamp, LOCATION_CACHE_DURATION)
+  ) {
+    const filteredResults = filterCitySuggestions(
+      cachedSearch.data,
+      trimmedQuery
+    );
     currentCities = filteredResults;
     if (filteredResults.length > 0) {
       displaySuggestions(filteredResults);
@@ -408,9 +617,9 @@ async function searchCities(query) {
       // Cache search results
       locationCache.set(searchCacheKey, {
         data: data.results,
-        timestamp: Date.now()
+        timestamp: Date.now(),
       });
-      
+
       const filteredResults = filterCitySuggestions(data.results, trimmedQuery);
       currentCities = filteredResults;
 
@@ -425,8 +634,8 @@ async function searchCities(query) {
       suggestions.classList.add("hidden");
     }
   } catch (error) {
-    if (error.name === 'AbortError') {
-      console.log('Search request timed out');
+    if (error.name === "AbortError") {
+      console.log("Search request timed out");
     } else {
       console.error("Search error:", error);
     }
@@ -452,8 +661,18 @@ function filterCitySuggestions(results, query) {
 
       const isLikelyCountryQuery =
         query.length > 5 &&
-        ["australia", "canada", "germany", "france", "italy", "spain", "japan", "brazil", "india", "china"]
-          .includes(query.toLowerCase());
+        [
+          "australia",
+          "canada",
+          "germany",
+          "france",
+          "italy",
+          "spain",
+          "japan",
+          "brazil",
+          "india",
+          "china",
+        ].includes(query.toLowerCase());
 
       if (
         isLikelyCountryQuery &&
