@@ -169,42 +169,66 @@ function removeWeatherAnimation() {
 
 function requestLocation() {
   if ("geolocation" in navigator) {
-    // First try: Use any cached location up to 10 minutes old for speed
+    // Strategy: Use very short timeout to force network-based location
+    // This prevents GPS from even starting
     navigator.geolocation.getCurrentPosition(
       function (position) {
-        // Success
+        // Success - got network/WiFi based location quickly
         loading.style.display = "block";
         locationPrompt.style.display = "none";
         getWeatherByCoords(position.coords.latitude, position.coords.longitude);
       },
       function (error) {
-        console.log("Geolocation failed:", error.code);
+        console.log("Fast location failed:", error.code);
 
-        // Only retry for Chrome mobile permission issues
-        if (error.code === 1 && isMobileChrome()) {
-          // 1 = PERMISSION_DENIED
-          setTimeout(() => {
-            navigator.geolocation.getCurrentPosition(
-              function (position) {
-                loading.style.display = "block";
-                locationPrompt.style.display = "none";
-                getWeatherByCoords(
-                  position.coords.latitude,
-                  position.coords.longitude
-                );
-              },
-              handleLocationError,
-              { timeout: 6000, enableHighAccuracy: false, maximumAge: 600000 } // 10min cache
+        // If quick network location fails, immediately try with cached location
+        navigator.geolocation.getCurrentPosition(
+          function (position) {
+            loading.style.display = "block";
+            locationPrompt.style.display = "none";
+            getWeatherByCoords(
+              position.coords.latitude,
+              position.coords.longitude
             );
-          }, 500); // Shorter delay
-        } else {
-          handleLocationError();
-        }
+          },
+          function (secondError) {
+            console.log("Cached location failed:", secondError.code);
+
+            // Last resort: Try one more time for Chrome mobile refresh bug
+            if (isMobileChrome()) {
+              setTimeout(() => {
+                navigator.geolocation.getCurrentPosition(
+                  function (position) {
+                    loading.style.display = "block";
+                    locationPrompt.style.display = "none";
+                    getWeatherByCoords(
+                      position.coords.latitude,
+                      position.coords.longitude
+                    );
+                  },
+                  handleLocationError,
+                  {
+                    timeout: 1500,
+                    enableHighAccuracy: false,
+                    maximumAge: 1800000, // 30 min - very old cache OK
+                  }
+                );
+              }, 200);
+            } else {
+              handleLocationError();
+            }
+          },
+          {
+            timeout: 1500, // Still quick
+            enableHighAccuracy: false,
+            maximumAge: 1800000, // Accept very old cached location (30 minutes)
+          }
+        );
       },
       {
-        timeout: 3000, // Much shorter timeout
+        timeout: 800, // Very short - forces network/WiFi location only
         enableHighAccuracy: false,
-        maximumAge: 600000, // Accept 10-minute old location for speed
+        maximumAge: 300000, // 5 minutes
       }
     );
   } else {
@@ -235,7 +259,7 @@ function isMobileChrome() {
   );
 }
 
-// weather fetching with caching
+// Optimized weather fetching with caching
 async function getWeatherByCoords(lat, lon) {
   const cacheKey = getCacheKey(lat, lon);
   const cached = weatherCache.get(cacheKey);
@@ -249,7 +273,7 @@ async function getWeatherByCoords(lat, lon) {
   }
 
   try {
-    // API call - only get what we need
+    // Optimized API call - only get what we need
     const response = await fetch(
       `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=precipitation_probability_max&timezone=auto&forecast_days=1`,
       {
@@ -289,7 +313,7 @@ async function getWeatherByCoords(lat, lon) {
   }
 }
 
-// city weather fetching
+// Optimized city weather fetching
 async function getWeatherByCity() {
   const cityName = cityInput.value.trim();
 
@@ -360,7 +384,7 @@ async function getWeatherByCity() {
   }
 }
 
-// city search with caching
+// Optimized city search with caching
 async function searchCities(query) {
   const trimmedQuery = query.trim();
 
