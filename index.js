@@ -95,7 +95,7 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 });
 
-// Weather animation functions
+// Weather animation functions (unchanged)
 function createWeatherAnimation(type) {
   removeWeatherAnimation();
   const animationContainer = document.createElement("div");
@@ -169,6 +169,7 @@ function removeWeatherAnimation() {
 
 function requestLocation() {
   if ("geolocation" in navigator) {
+    // First try: Use any cached location up to 10 minutes old for speed
     navigator.geolocation.getCurrentPosition(
       function (position) {
         // Success
@@ -179,9 +180,9 @@ function requestLocation() {
       function (error) {
         console.log("Geolocation failed:", error.code);
 
-        // Chrome mobile specific: if permission denied but we're on Chrome mobile, try once more
-        if (error.code === error.PERMISSION_DENIED && isMobileChrome()) {
-          // Give Chrome mobile a moment and try again (common after refresh)
+        // Only retry for Chrome mobile permission issues
+        if (error.code === 1 && isMobileChrome()) {
+          // 1 = PERMISSION_DENIED
           setTimeout(() => {
             navigator.geolocation.getCurrentPosition(
               function (position) {
@@ -192,20 +193,18 @@ function requestLocation() {
                   position.coords.longitude
                 );
               },
-              function () {
-                handleLocationError();
-              },
-              { timeout: 6000, enableHighAccuracy: false, maximumAge: 300000 } // Accept 5min old location
+              handleLocationError,
+              { timeout: 3000, enableHighAccuracy: false, maximumAge: 600000 } // 10min cache
             );
-          }, 1000); // Just 1 second delay
+          }, 500); // Shorter delay
         } else {
           handleLocationError();
         }
       },
       {
-        timeout: 4000,
+        timeout: 2500, // Much shorter timeout
         enableHighAccuracy: false,
-        maximumAge: 60000,
+        maximumAge: 600000, // Accept 10-minute old location for speed
       }
     );
   } else {
@@ -236,6 +235,7 @@ function isMobileChrome() {
   );
 }
 
+// weather fetching with caching
 async function getWeatherByCoords(lat, lon) {
   const cacheKey = getCacheKey(lat, lon);
   const cached = weatherCache.get(cacheKey);
@@ -249,6 +249,7 @@ async function getWeatherByCoords(lat, lon) {
   }
 
   try {
+    // API call - only get what we need
     const response = await fetch(
       `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=precipitation_probability_max&timezone=auto&forecast_days=1`,
       {
@@ -288,6 +289,7 @@ async function getWeatherByCoords(lat, lon) {
   }
 }
 
+// city weather fetching
 async function getWeatherByCity() {
   const cityName = cityInput.value.trim();
 
@@ -358,7 +360,7 @@ async function getWeatherByCity() {
   }
 }
 
-// Optimized city search with caching
+// city search with caching
 async function searchCities(query) {
   const trimmedQuery = query.trim();
 
@@ -597,4 +599,4 @@ function showError(message) {
   result.style.display = "block";
 }
 
-const debouncedSearch = debounce(searchCities, 300);
+const debouncedSearch = debounce(searchCities, 300); // Increased debounce time
