@@ -95,7 +95,7 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 });
 
-// Weather animation functions (unchanged)
+// Weather animation functions
 function createWeatherAnimation(type) {
   removeWeatherAnimation();
   const animationContainer = document.createElement("div");
@@ -169,48 +169,6 @@ function removeWeatherAnimation() {
 
 function requestLocation() {
   if ("geolocation" in navigator) {
-    // Check if we have permissions first (Chrome mobile fix)
-    if (navigator.permissions) {
-      navigator.permissions
-        .query({ name: "geolocation" })
-        .then(function (result) {
-          if (result.state === "granted") {
-            // Permission already granted, get location immediately
-            getCurrentLocationWithRetry();
-          } else if (result.state === "prompt") {
-            // Will prompt user
-            getCurrentLocationWithRetry();
-          } else {
-            // Permission denied
-            handleLocationError();
-          }
-        })
-        .catch(function () {
-          // Fallback if permissions API not supported
-          getCurrentLocationWithRetry();
-        });
-    } else {
-      // Fallback if permissions API not supported
-      getCurrentLocationWithRetry();
-    }
-  } else {
-    loading.style.display = "none";
-    locationPrompt.style.display = "none";
-    permissionDenied.innerHTML =
-      '<p><i class="fas fa-exclamation-circle"></i> Geolocation is not supported by your browser. Please enter your city manually.</p>';
-    permissionDenied.style.display = "block";
-    inputSection.style.display = "block";
-    result.style.display = "none";
-  }
-}
-
-function getCurrentLocationWithRetry() {
-  let attempts = 0;
-  const maxAttempts = 3;
-
-  function tryGetLocation() {
-    attempts++;
-
     navigator.geolocation.getCurrentPosition(
       function (position) {
         // Success
@@ -219,25 +177,11 @@ function getCurrentLocationWithRetry() {
         getWeatherByCoords(position.coords.latitude, position.coords.longitude);
       },
       function (error) {
-        console.log(
-          `Geolocation attempt ${attempts} failed:`,
-          error.code,
-          error.message
-        );
+        console.log("Geolocation failed:", error.code);
 
-        // Chrome mobile specific handling
-        if (error.code === error.TIMEOUT && attempts < maxAttempts) {
-          // Retry with different options
-          setTimeout(tryGetLocation, 1000);
-          return;
-        }
-
-        // If it's a permission error on mobile Chrome, try one more time with different settings
-        if (
-          error.code === error.PERMISSION_DENIED &&
-          attempts === 1 &&
-          isMobileChrome()
-        ) {
+        // Chrome mobile specific: if permission denied but we're on Chrome mobile, try once more
+        if (error.code === error.PERMISSION_DENIED && isMobileChrome()) {
+          // Give Chrome mobile a moment and try again (common after refresh)
           setTimeout(() => {
             navigator.geolocation.getCurrentPosition(
               function (position) {
@@ -251,23 +195,28 @@ function getCurrentLocationWithRetry() {
               function () {
                 handleLocationError();
               },
-              { timeout: 10000, enableHighAccuracy: false, maximumAge: 60000 }
+              { timeout: 6000, enableHighAccuracy: false, maximumAge: 300000 } // Accept 5min old location
             );
-          }, 2000);
-          return;
+          }, 1000); // Just 1 second delay
+        } else {
+          handleLocationError();
         }
-
-        handleLocationError();
       },
       {
-        timeout: attempts === 1 ? 8000 : 15000,
+        timeout: 4000,
         enableHighAccuracy: false,
-        maximumAge: attempts === 1 ? 10000 : 60000,
+        maximumAge: 60000,
       }
     );
+  } else {
+    loading.style.display = "none";
+    locationPrompt.style.display = "none";
+    permissionDenied.innerHTML =
+      '<p><i class="fas fa-exclamation-circle"></i> Geolocation is not supported by your browser. Please enter your city manually.</p>';
+    permissionDenied.style.display = "block";
+    inputSection.style.display = "block";
+    result.style.display = "none";
   }
-
-  tryGetLocation();
 }
 
 function handleLocationError() {
@@ -287,7 +236,6 @@ function isMobileChrome() {
   );
 }
 
-// Optimized weather fetching with caching
 async function getWeatherByCoords(lat, lon) {
   const cacheKey = getCacheKey(lat, lon);
   const cached = weatherCache.get(cacheKey);
@@ -301,11 +249,10 @@ async function getWeatherByCoords(lat, lon) {
   }
 
   try {
-    // Optimized API call - only get what we need
     const response = await fetch(
       `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&daily=precipitation_probability_max&timezone=auto&forecast_days=1`,
       {
-        signal: AbortSignal.timeout(8000),
+        signal: AbortSignal.timeout(8000), // 8 second timeout
       }
     );
 
@@ -341,7 +288,6 @@ async function getWeatherByCoords(lat, lon) {
   }
 }
 
-// Optimized city weather fetching
 async function getWeatherByCity() {
   const cityName = cityInput.value.trim();
 
@@ -381,7 +327,7 @@ async function getWeatherByCity() {
         cityName
       )}&count=1&language=en&format=json`,
       {
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(5000), // 5 second timeout
       }
     );
 
@@ -445,7 +391,7 @@ async function searchCities(query) {
 
   try {
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000);
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
 
     const response = await fetch(
       `https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(
