@@ -194,7 +194,7 @@ function requestLocation() {
                 );
               },
               handleLocationError,
-              { timeout: 3000, enableHighAccuracy: false, maximumAge: 600000 } // 10min cache
+              { timeout: 6000, enableHighAccuracy: false, maximumAge: 600000 } // 10min cache
             );
           }, 500); // Shorter delay
         } else {
@@ -202,7 +202,7 @@ function requestLocation() {
         }
       },
       {
-        timeout: 2500, // Much shorter timeout
+        timeout: 3000, // Much shorter timeout
         enableHighAccuracy: false,
         maximumAge: 600000, // Accept 10-minute old location for speed
       }
