@@ -95,7 +95,7 @@ document.addEventListener("DOMContentLoaded", function () {
   });
 });
 
-// Weather animation functions
+// Weather animation functions (unchanged)
 function createWeatherAnimation(type) {
   removeWeatherAnimation();
   const animationContainer = document.createElement("div");
@@ -169,21 +169,30 @@ function removeWeatherAnimation() {
 
 function requestLocation() {
   if ("geolocation" in navigator) {
-    navigator.geolocation.getCurrentPosition(
-      function (position) {
-        loading.style.display = "block";
-        locationPrompt.style.display = "none";
-        getWeatherByCoords(position.coords.latitude, position.coords.longitude);
-      },
-      function (error) {
-        loading.style.display = "none";
-        locationPrompt.style.display = "none";
-        permissionDenied.style.display = "block";
-        inputSection.style.display = "block";
-        result.style.display = "none";
-      },
-      { timeout: 5000, enableHighAccuracy: false }
-    );
+    // Check if we have permissions first (Chrome mobile fix)
+    if (navigator.permissions) {
+      navigator.permissions
+        .query({ name: "geolocation" })
+        .then(function (result) {
+          if (result.state === "granted") {
+            // Permission already granted, get location immediately
+            getCurrentLocationWithRetry();
+          } else if (result.state === "prompt") {
+            // Will prompt user
+            getCurrentLocationWithRetry();
+          } else {
+            // Permission denied
+            handleLocationError();
+          }
+        })
+        .catch(function () {
+          // Fallback if permissions API not supported
+          getCurrentLocationWithRetry();
+        });
+    } else {
+      // Fallback if permissions API not supported
+      getCurrentLocationWithRetry();
+    }
   } else {
     loading.style.display = "none";
     locationPrompt.style.display = "none";
@@ -193,6 +202,89 @@ function requestLocation() {
     inputSection.style.display = "block";
     result.style.display = "none";
   }
+}
+
+function getCurrentLocationWithRetry() {
+  let attempts = 0;
+  const maxAttempts = 3;
+
+  function tryGetLocation() {
+    attempts++;
+
+    navigator.geolocation.getCurrentPosition(
+      function (position) {
+        // Success
+        loading.style.display = "block";
+        locationPrompt.style.display = "none";
+        getWeatherByCoords(position.coords.latitude, position.coords.longitude);
+      },
+      function (error) {
+        console.log(
+          `Geolocation attempt ${attempts} failed:`,
+          error.code,
+          error.message
+        );
+
+        // Chrome mobile specific handling
+        if (error.code === error.TIMEOUT && attempts < maxAttempts) {
+          // Retry with different options
+          setTimeout(tryGetLocation, 1000);
+          return;
+        }
+
+        // If it's a permission error on mobile Chrome, try one more time with different settings
+        if (
+          error.code === error.PERMISSION_DENIED &&
+          attempts === 1 &&
+          isMobileChrome()
+        ) {
+          setTimeout(() => {
+            navigator.geolocation.getCurrentPosition(
+              function (position) {
+                loading.style.display = "block";
+                locationPrompt.style.display = "none";
+                getWeatherByCoords(
+                  position.coords.latitude,
+                  position.coords.longitude
+                );
+              },
+              function () {
+                handleLocationError();
+              },
+              { timeout: 10000, enableHighAccuracy: false, maximumAge: 60000 }
+            );
+          }, 2000);
+          return;
+        }
+
+        handleLocationError();
+      },
+      {
+        timeout: attempts === 1 ? 8000 : 15000,
+        enableHighAccuracy: false,
+        maximumAge: attempts === 1 ? 10000 : 60000,
+      }
+    );
+  }
+
+  tryGetLocation();
+}
+
+function handleLocationError() {
+  loading.style.display = "none";
+  locationPrompt.style.display = "none";
+  permissionDenied.style.display = "block";
+  inputSection.style.display = "block";
+  result.style.display = "none";
+}
+
+function isMobileChrome() {
+  const userAgent = navigator.userAgent;
+  return (
+    /Chrome/.test(userAgent) &&
+    /Mobile/.test(userAgent) &&
+    !/Edge/.test(userAgent)
+  );
 }
 
 // Optimized weather fetching with caching
