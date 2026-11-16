@@ -1,65 +1,53 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Umbrella? - Weather Check</title>
-    <link
-      rel="stylesheet"
-      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
-    />
-    <link rel="stylesheet" type="text/css" href="styles.css" />
-  </head>
-  <body>
-    <div class="container">
-      <h1><i class="fas fa-umbrella"></i> Umbrella?</h1>
-      <p class="description">
-        Find out if you need an umbrella today based on real weather data.
-      </p>
-
-      <div class="loading" id="loading">
-        <div class="spinner"></div>
-        <p>Checking your location...</p>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description" content="Do I need an umbrella? A one-word answer from the next 12 hours of forecast." />
+  <title>Do I need an umbrella?</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-verdict="none">
+  <main class="card">
+    <form id="search" role="search" autocomplete="off">
+      <label for="city" class="sr">City</label>
+      <div class="field">
+        <input id="city" type="text" role="combobox" aria-expanded="false" aria-controls="suggestions" aria-autocomplete="list" placeholder="Search a city" />
+        <ul id="suggestions" role="listbox" hidden></ul>
       </div>
+      <button type="submit">Check</button>
+    </form>
 
-      <div class="location-prompt" id="location-prompt">
-        <i class="fas fa-map-marker-alt"></i>
-        <p>Please allow location access to check weather automatically</p>
-      </div>
-
-      <div class="permission-denied" id="permission-denied">
-        <p>
-          <i class="fas fa-exclamation-circle"></i> Location access denied.
-          Please enter your city manually.
-        </p>
-      </div>
-
-      <div class="input-section" id="input-section">
-        <div class="input-group">
-          <input
-            type="text"
-            id="city-input"
-            placeholder="Enter your city name"
-            autocomplete="off"
-          />
-          <div id="suggestions" class="suggestions hidden"></div>
-        </div>
-
-        <button id="check-btn">
-          <i class="fas fa-search"></i> Check Weather
-        </button>
-      </div>
-
-      <div class="result" id="result">
-        <!-- Result will be populated dynamically -->
-      </div>
-
-      <div class="footer">
-        <p>Uses real weather data from Open-Meteo API</p>
-        <p class="credit">Data provided by Open-Meteo.com</p>
-      </div>
+    <div class="hero">
+      <svg class="icon" viewBox="0 0 120 120" aria-hidden="true">
+        <g class="i-yes">
+          <path d="M8 62A52 52 0 0 1 112 62Q98 50 86 62Q73 50 60 62Q47 50 34 62Q22 50 8 62Z" fill="currentColor"/>
+          <path d="M60 62V96a9 9 0 0 1-18 0" fill="none" stroke="currentColor" stroke-width="6" stroke-linecap="round"/>
+          <path class="drops" d="M24 86v8M96 80v8M78 100v8" stroke="currentColor" stroke-width="5" stroke-linecap="round"/>
+        </g>
+        <g class="i-maybe">
+          <circle cx="78" cy="42" r="20" fill="currentColor" opacity=".55"/>
+          <path d="M34 98h50a17 17 0 0 0 0-34 24 24 0 0 0-46-5 20 20 0 0 0-4 39z" fill="currentColor"/>
+        </g>
+        <g class="i-no">
+          <circle cx="60" cy="60" r="24" fill="currentColor"/>
+          <circle cx="60" cy="60" r="40" fill="none" stroke="currentColor" stroke-width="7" stroke-dasharray="5 15.7" stroke-linecap="round"/>
+        </g>
+      </svg>
+      <p class="question">Do I need an umbrella?</p>
+      <h1 id="answer">…</h1>
+      <p id="detail">Checking the next 12 hours.</p>
     </div>
 
-    <script src="index.js"></script>
-  </body>
+    <section class="forecast" aria-label="Chance of rain, next 12 hours">
+      <ol id="chart"></ol>
+      <p class="meta"><span id="place"></span><span id="temp"></span></p>
+    </section>
+
+    <button id="unit" type="button" class="link"></button>
+    <p id="status" class="sr" role="status" aria-live="polite"></p>
+  </main>
+  <footer>Forecast data by <a href="https://open-meteo.com/">Open-Meteo.com</a></footer>
+  <script type="module" src="src/app.js"></script>
+</body>
 </html>

@@ -1,0 +1,8 @@
+{
+  "name": "do-i-need-an-umbrella",
+  "version": "2.0.0",
+  "description": "One-word umbrella answer from the next 12 hours of forecast.",
+  "type": "module",
+  "scripts": { "test": "node --test" },
+  "license": "MIT"
+}

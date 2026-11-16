@@ -1,33 +1,53 @@
-# Umbrella? - Weather Check App
+# Do I need an umbrella?
 
-A simple web app that tells you if you need an umbrella today based on real weather data.
+A tiny weather app that answers one question in one word, using the next 12 hours of forecast rather than a single daily number.
 
-## Features
+**Live demo:** _add your GitHub Pages link here_ · ![CI](../../actions/workflows/ci.yml/badge.svg)
 
-- **Automatic Location Detection**: Uses geolocation to check weather for your current location
-- **Manual City Search**: Type any city name to check weather conditions
-- **Smart Suggestions**: Auto-complete with city suggestions as you type
-- **Visual Feedback**: Animated weather effects (rain, sun, clouds) based on conditions
-- **Clear Results**: Simple YES/NO/MAYBE answers with precipitation percentages
+<!-- Add a screenshot or GIF here: docs/screenshot.png -->
 
-## How to Use
+## What it does
 
-1. Allow location access for automatic weather check
-2. Or type a city name in the search field
-3. Select from suggested cities as you type
-4. Get instant answer about umbrella necessity
+- Detects your location, or lets you search any city with keyboard-friendly autocomplete.
+- Looks at hourly rain probability **and** expected rainfall, then says **Yes**, **Maybe** or **No**.
+- Shows an hourly chart so you can see *when* the rain is coming.
+- Remembers your last city and °C/°F choice, and follows your light/dark setting.
 
-## Technology
+## Decision rules
 
-- **Frontend**: HTML, CSS, JavaScript
-- **API**: Open-Meteo for weather data and geocoding
-- **Icons**: Font Awesome
-- **Animations**: Custom CSS animations
+| Answer | When (next 12 hours) |
+| ------ | -------------------- |
+| Yes    | Peak chance ≥ 60%, or ≥ 2 mm total |
+| Maybe  | Peak chance ≥ 30%, or ≥ 0.3 mm total |
+| No     | Anything lower |
 
-## Setup
+The rules live in `src/logic.js` as pure functions and are covered by unit tests.
 
-Simply open `index.html` in a web browser. No build process or dependencies required.
+## Engineering notes
 
-## Data Source
+- **Plain HTML, CSS and JavaScript.** Native ES modules, no build step, hosted as-is on GitHub Pages.
+- **Separated concerns:** `logic.js` (pure decisions), `api.js` (fetch and cache), `app.js` (DOM).
+- **Safe rendering:** API data is inserted with `textContent`, never `innerHTML`.
+- **Accessible:** ARIA combobox with arrow-key navigation, live-region updates, visible focus, reduced-motion support.
+- **Resilient:** request timeouts, cancelled stale searches, 10-minute response cache, storage failures handled.
+- **CI:** tests run on every push via GitHub Actions.
 
-Weather data provided by [Open-Meteo.com](https://open-meteo.com/)
+## Run it
+
+No install or build step. Serve the folder and open it:
+
+```bash
+python3 -m http.server   # then visit http://localhost:8000
+```
+
+Deploy by enabling **Settings → Pages → Deploy from a branch → main / root**.
+
+Optional: `npm test` runs the unit tests (needs Node 20+; only for development).
+
+## Data
+
+Weather and geocoding by [Open-Meteo](https://open-meteo.com/) (free, no API key).
+
+## Ideas for next
+
+Reverse-geocode the "your location" label, add a 7-day view, make it an installable PWA.
